@@ -1,0 +1,139 @@
+
+		state out_block_state = local_cache_Block->getState();
+		if(out_block_state == SHD && operation== 'w')
+            {
+                main_Bus_Instance->postBusRdX(ul_addr);
+                local_cache_Block->setState(MOD);
+                cacheArray[proc_number%num_processors]->increment_counter(SHD, MOD);
+            }
+		else if(out_block_state == INV && operation == 'r')
+            {
+                main_Bus_Instance->postBusRd(ul_addr);
+                local_cache_Block->setState(SHD);
+                cacheArray[proc_number%num_processors]->increment_counter(INV, SHD);
+            }
+		else if(out_block_state == INV && operation == 'w')
+            {
+                main_Bus_Instance->postBusRdX(ul_addr);
+                local_cache_Block->setState(MOD);
+                cacheArray[proc_number%num_processors]->increment_counter(INV, MOD);
+            }
+		else
+            {
+                main_Bus_Instance->clearBus();
+                local_cache_Block->setState(out_block_state);
+            }
+
+
+
+// Bus side signals
+
+
+
+		signal signal_on_bus = main_Bus_Instance->getBusSignal();
+        ulong addr_on_bus = main_Bus_Instance->getSignalAddr();
+		if(signal_on_bus != clear)
+            {
+                cacheBlock* loc_c_block;
+                for(int i=0; i<num_processors; i++)
+                    {
+                        if(i == proc_number%num_processors) continue;
+
+                        loc_c_block = cacheArray[i]->findBlock(addr_on_bus);
+                        if(loc_c_block == NULL) continue;
+                        else
+                            {
+                                state local_block_state = loc_c_block->getState();
+                                if(signal_on_bus == BusRd && local_block_state == MOD)
+                                    {
+                                        loc_c_block->setState(SHD);
+                                        cacheArray[i]->increment_counter(MOD, SHD);
+                                        // Flush
+                                    }
+                                else if(signal_on_bus == BusRdX && local_block_state == MOD)
+                                    {
+                                        loc_c_block->setState(INV);
+                                        // Flush
+                                    }
+                                else if(signal_on_bus == BusRdX && local_block_state == SHD)
+                                    {
+                                        loc_c_block->setState(INV);
+                                    }
+                                else loc_c_block->setState(local_block_state);
+                            }
+                    }
+            }
+
+        main_Bus_Instance->clearBus();
+
+
+
+/*
+
+// Get state of cache block
+state block_state = local_cache_Block->getState(); //MOD, SHD, INV, EXC, OWN
+ulong block_flag = local_cache_Block->getFlags(); // 0:invalid, 1:valid, 2:dirty
+
+
+main_Bus_Instance->clearBus();
+
+if(main_Bus_Instance->isFlush_on_Bus()) main_Bus_Instance->flush_received();
+
+
+
+// STATE MACHINE
+if(cache_protocol == MSI)
+{
+
+if(block_state == MOD)
+        {
+        // When BusRd or BusRdX on Bus: leave state
+        if(signal_on_bus == BusRd)
+            {
+                local_cache_Block->setState(SHD);
+                main_Bus_Instance->flush_to_Bus();
+                num_transit_mod_to_shd++;
+            }
+        else if(signal_on_bus==BusRdX)
+            {
+                local_cache_Block->setState(INV);
+                main_Bus_Instance->flush_to_Bus();
+            }
+        else if(op == 'r' || op == 'w') local_cache_Block->setState(MOD);
+        }
+
+
+else if(block_state==SHD)
+        {
+        // If PrWr post BusRdX to Bus
+        if(signal_on_bus==BusRdX) local_cache_Block->setState(INV);
+        else if(op=='w')
+            {
+                main_Bus_Instance->postBusRdX(addr, cache_id);
+                local_cache_Block->setState(MOD);
+                num_transit_shd_to_mod++;
+            }
+        else if(op=='r') local_cache_Block->setState(SHD);
+        }
+
+else if(block_state==INV)
+        {
+        if(signal_on_bus==BusRd || signal_on_bus==BusRdX) local_cache_Block->setState(INV);
+        else if(op == 'w')
+                {
+                    local_cache_Block->setState(MOD);
+                    main_Bus_Instance->postBusRdX(addr, cache_id);
+                    num_transit_inv_to_mod++;
+                }
+        else if(op == 'r')
+                {
+                    local_cache_Block->setState(SHD);
+                    main_Bus_Instance->postBusRd(addr, cache_id);
+                    num_transit_inv_to_shd++;
+                }
+        }
+
+} // End MSI
+*/
+
+

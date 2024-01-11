@@ -1,0 +1,68 @@
+
+		state out_block_state = local_cache_Block->getState();
+		if(out_block_state == SHD && operation== 'w')
+            {
+                main_Bus_Instance->postBusRdX(ul_addr);
+                local_cache_Block->setState(MOD);
+                cacheArray[proc_number%num_processors]->increment_counter(SHD, MOD);
+            }
+		else if(out_block_state == INV && operation == 'r')
+            {
+                main_Bus_Instance->postBusRd(ul_addr);
+                local_cache_Block->setState(SHD);
+                cacheArray[proc_number%num_processors]->increment_counter(INV, SHD);
+            }
+		else if(out_block_state == INV && operation == 'w')
+            {
+                main_Bus_Instance->postBusRdX(ul_addr);
+                local_cache_Block->setState(MOD);
+                cacheArray[proc_number%num_processors]->increment_counter(INV, MOD);
+            }
+		else
+            {
+                main_Bus_Instance->clearBus();
+                local_cache_Block->setState(out_block_state);
+            }
+
+
+
+// Bus side signals
+
+
+
+		signal signal_on_bus = main_Bus_Instance->getBusSignal();
+        ulong addr_on_bus = main_Bus_Instance->getSignalAddr();
+		if(signal_on_bus != clear)
+            {
+                cacheBlock* loc_c_block;
+                for(int i=0; i<num_processors; i++)
+                    {
+                        if(i == proc_number%num_processors) continue;
+
+                        loc_c_block = cacheArray[i]->findBlock(addr_on_bus);
+                        if(loc_c_block == NULL) continue;
+                        else
+                            {
+                                state local_block_state = loc_c_block->getState();
+                                if(signal_on_bus == BusRd && local_block_state == MOD)
+                                    {
+                                        loc_c_block->setState(SHD);
+                                        cacheArray[i]->increment_counter(MOD, SHD);
+                                        // Flush
+                                    }
+                                else if(signal_on_bus == BusRdX && local_block_state == MOD)
+                                    {
+                                        loc_c_block->setState(INV);
+                                        // Flush
+                                    }
+                                else if(signal_on_bus == BusRdX && local_block_state == SHD)
+                                    {
+                                        loc_c_block->setState(INV);
+                                    }
+                                else loc_c_block->setState(local_block_state);
+                            }
+                    }
+            }
+
+        main_Bus_Instance->clearBus();
+
